@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+#%SUMMARY: cache symlinks to all commands found under XDG paths
+#%USAGE:(once): export APP_CACHE_DIR=$(app-xdg-cache app); exec app "$@"
+#%PERF: first=37ms idle=23ms
+set -fCueo pipefail -o noglob
+
+# FIXED: concurrent caching on very first run by two piped processes $ app ... | app ...
+[[ ${GUARDED+x} ]] || GUARDED="$0" exec flock -x "$0" "$0" "$@"
+set -r
+
+# MAYBE: not the best way to combine XDG search with default env/dirs creation...
+pkgdirs=( "${WIW_AUTH_DIR:?}" "${WIW_TEMP_DIR:?}" )
+
+pkgname=${1:-wiw}
+
+# ATT: extensions to XDG standard :: infix=[_LIBEXEC_] and sfx=[_PATH]
+libexecpath=${XDG_LIBEXEC_PATH-${XDG_LIBEXEC_HOME-$HOME/.local/libexec}:${XDG_LIBEXEC_DIRS-/usr/local/libexec:/usr/libexec}}
+cachedir=${XDG_CACHE_HOME:-$HOME/.cache}
+d_cache=$cachedir/$pkgname
+
+paths_under(){ sed 's/^/:/; s/$/:/; s/\s*:\s*/:/g; s/:\+/:/g; s/^://; s|:|/'"$1"':|g; s/:$//; s/:/\n/g'; }
+
+dirs_validate(){ declare -rn ds=$1; ds=()
+  while IFS= read -r d; do [[ -d $d ]] && ds+=("$d"); done
+  ((${#ds[@]})) || return 1
+}
+
+# shellcheck disable=SC2178
+dirs_merge(){ declare -rn ds=$1; shift
+  find -H "${ds[@]}" -mindepth 1 -xdev \( -name '_*' -o -name '.git' \) -prune -o \
+    "$@" -printf '%P:%p\n' | awk -F: '!a[$1]++ && $2'
+}
+
+cache_exe(){ local -r d=$1; shift
+  while IFS=: read -r nm pth; do
+    # DEBUG: >&2 echo "$nm : $pth : $d/${nm%/*}"
+    [[ $d/$nm -ef $pth ]] && continue
+    [[ $nm =~ / ]] && mkdir -p "$d/${nm%/*}"
+    command ln -sfPT -- "$pth" "$d/$nm"
+  done
+}
+
+# THINK:BET: only allow symlinks pointing inside "lpath" -- use XDG_LIBEXEC_DIRS for other locations
+#   OR?BAD: anywhere (so user could deploy by symlinks) ?
+#   MAYBE: symlinks to dir -- inside "lpath", but symlinks to file -- anywhere ?
+#     NICE: you can symlink your private extensions into std dirs instead of modifying ENV paths
+#     BAD:SECU: end-file can be uncontrollably replaced by something harmful
+copy_symlinks(){ local d=$1 src dst; shift
+  while IFS=: read -r nm pth; do
+    src=$(realpath -e --relative-base="${pth%/$nm}" -- "$pth")
+    [[ $src == /* ]] && >&2 echo "Warn: ignoring external symlink=$pth" && continue
+    dst=$(realpath -m --relative-base="$d" -- "$d/$nm")
+    [[ $src == "$dst" ]] && continue
+    [[ $nm =~ / ]] && mkdir -p "$d/${nm%/*}"
+    command cp -afPT -- "$pth" "$d/$nm"
+  done
+}
+
+# DEV: clean-up cache dir from previous stale symlinks (and only symlinks -- keep other data)
+mkdir -p "${pkgdirs[@]}"
+chmod 700 "${pkgdirs[@]}"
+
+existingdirs=$(paths_under "$pkgname" <<< "$libexecpath")
+dirs_validate lpath <<< "$existingdirs"
+dirs_merge lpath -type f -executable | cache_exe "$d_cache"
+dirs_merge lpath -type l | copy_symlinks "$d_cache"
+
+printf '%s\n' "$d_cache"

@@ -1,0 +1,33 @@
+#compdef wiw
+#%USAGE: $ rm ~/.cache/zsh/.zcompdump{,.zwc} && compinit
+#%OR:DEBUG:(current shell only): $ compinit -D
+
+# WARN: each exe must implement "--suggest-next-option" for ZSH to work smoothly
+# TRY:FIXME: do nothing if option not implemented
+# [_] BUG: why it tries to complete only when WIW_CACHE_DIR is set ?
+
+function _wiw_formats {
+    local -a _formats
+    # _formats=( 'list:List available profiles' ... )
+    _formats=( "${(f)"$(wiw --suggest-next-option)":gs/:/\\:}" )
+    _describe "supported formats" _formats
+}
+
+# ENH: suggest slash-cmds if cmdword1 =~ "/" already
+# FIXME: allow --opts after each cmdword
+case $service in wiw)
+case $CURRENT in
+2) _arguments \
+  '(-h --help)'{-h,--help}'[display help message]' \
+  '(- :)--version[print version information]' \
+  '(- :)--suggest-next-option[suggest next cmdword]' \
+  '(-)::xxx:_wiw_formats'
+  ;;
+[3-9])
+  # NOTE: skip if empty (compadd "") -- prevent space inserting
+  # print -l @ $CURRENT $words >&2
+  local opts=$(wiw $words[2,$CURRENT-1] --suggest-next-option)
+  [[ -n $opts ]] && compadd "${(f)opts}"
+  ;;
+esac
+esac
