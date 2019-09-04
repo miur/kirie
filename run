@@ -14,8 +14,11 @@ set -eu
 
 nm=wiw
 
-export WIW_AUTH_DIR=${XDG_CACHE_HOME:-$HOME/.cache}/$nm/_auth
-export WIW_TEMP_DIR=${TMPDIR:-/tmp}/$nm
+# NOTE: don't override user settings, only fallback
+set -o allexport
+: "${WIW_AUTH_DIR:=${XDG_CACHE_HOME:-$HOME/.cache}/$nm/_auth}"
+: "${WIW_TEMP_DIR:=${TMPDIR:-/tmp}/$nm}"
+set +o allexport
 
 
 if test "x${1-}" == "x--recache"; then
