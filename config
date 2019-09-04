@@ -1,0 +1,104 @@
+#!/usr/bin/env perl
+#%SUMMARY: read requested XDG config(s) and export their keyvalues to ENV
+#%USAGE:
+#%  [augment] $ ./$0 [opts] {name|subpath} [fallbacks] -- cmd [args]
+#%  [replace] $ ./$0 --force {name|subpath} [overrides] -- cmd [args]
+#%  [cleanup] $ ./$0 --clean {name|subpath} [extends] -- cmd [args]
+#%
+#%FORMAT:[<]
+#%  * LN_BASIC ::= KEY "=" VALUE NL
+#%  * LN_FULL  ::= SPACE KEY SPACE "=" SPACE QUOTE VALUE QUOTE SPACE ESC NL
+#%
+use warnings FATAL => 'all';
+use autodie;
+use strict;
+use 5.010;  # for '//' -- fallback if not defined
+use Getopt::Long qw(GetOptions :config bundling require_order
+no_auto_abbrev no_getopt_compat no_ignore_case no_pass_through);
+
+$ENV{XDG_CONFIG_HOME} //= $ENV{HOME} . "/.config";
+$ENV{WIW_CONFIG_DIR} //= $ENV{XDG_CONFIG_HOME} . "/wiw";
+
+my $dconfig = $ENV{WIW_CONFIG_DIR};
+
+# NOTE: cmdline validation
+my ($index) = grep { $ARGV[$_] eq '--' } (0 .. $#ARGV);
+die "Err: insert separator '--' between config name and executed command",$/ if not defined $index;
+die "Err: add cmdline to exec after '--' separator",$/ if $index == $#ARGV;
+my $rindex = $#ARGV - $index;
+
+
+my %opts = ();
+GetOptions(\%opts   #%OPTIONS:
+, 'clean|c!'        #% c = clean        | remove from environment all keys defined in configs
+, 'force|f!'        #% f = force        | force override existing env vars by config values DFL=keep
+, 'skip-errors|s!'  #% s = skip-errors  | skip no-such-file or permission-denied
+#%
+, 'help|h|?'        #% h = help
+    => sub { print &help; exit }
+) or die $/,&help;  #%
+
+sub help { open STDIN,'<',$0; grep { $_ } map { $1.$/ if /^(?:.*\s)?#%(.*)/ } <STDIN> }
+
+# WARN:FIXED: GetOptions(require_order) consumes "--" options terminator when there is no config on cmdline
+# WARN:FAIL: $ ./$0 [opts] -- config -- command
+$index = $#ARGV - $rindex;
+my @configs = map { $dconfig .'/'. $_ } @ARGV[0 .. $index - 1];
+my @cmd = @ARGV[$index + 1 .. $#ARGV];
+
+# MAYBE: allow full path to config BET: use separate config/to/keyval tool for this
+# TODO:SPLIT: $ arg/to/line nm... | path/absolute <d_cfg> | path/read-blob | config/to/keyval | keyval/to/env -- cmdline...
+#   <= use layers :: wiw.config // kirie.config // dast.config
+#     BAD: reverse-cyclic-dependency kirie -> dast -> kirie
+
+for my $cfg (@configs) {
+    my $fh;
+    # TRY:(\die): eval { open($fh, '<', $cfg) } or $fn_err;
+    eval { open($fh, '<', $cfg) };
+    if ($@) { defined $opts{'skip-errors'} ? next : die; }
+
+    #%FORMAT: <transformations>
+    while (<$fh>) {
+        chomp;
+
+        #% * ltrim leading spaces (before KEY, comments and continuations)
+        s/^\s+//;
+
+        #% * remove comments (allowed even after line ending by "\")
+        s/\s*#.*$//;
+
+        #% * join lines ending with single "\" (don't work on comments)
+        if (s/\\$//) {
+            $_ .= <$fh>;
+            redo unless eof($fh);
+        }
+
+        #% * rtrim trailing spaces (after VALUE)
+        s/\s+$//;
+
+        #% * remove empty lines
+        next if $_ eq '';
+
+        # parse key-value
+        /^(\w+)\s*=\s*(.*)$/ or die "Err: key-value syntax error: '$_'";
+        my ($k, $v) = ($1, $2);
+
+        #% * remove surrounding quotes
+        my $q = substr($v, 0, 1).substr($v, -1, 1);
+        $v = substr($v, 1, -1) if $q eq "''" or $q eq '""';
+
+        if ($opts{clean}) {
+            delete $ENV{ $k };
+        } elsif ($opts{force}) {
+            $ENV{ $k } = $v;
+        } else {
+            $ENV{ $k } //= $v;
+        }
+
+        # DEBUG: print STDERR $_, $/;
+    }
+
+    close $fh;
+}
+
+exec { $cmd[0] } @cmd;
