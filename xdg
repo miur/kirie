@@ -2,7 +2,14 @@
 #%SUMMARY: cache symlinks to all commands found under XDG paths
 #%USAGE:(once): export APP_CACHE_DIR=$(app-xdg-cache app); exec app "$@"
 #%PERF: first=37ms idle=23ms
-set -fCueo pipefail -o noglob
+set -fCueo pipefail
+
+# NEED: I need cleanup for old links
+#   <= earlier I had no such problem due to using text file recreated each time...
+#   MAYBE:IDEA: dump list of symlinks into stampfile and then cleanup from folder all links not in that file ?
+#   PERF:BAD: twice the work to recache
+
+# MAYBE: also use ~/.local/share/wiw as fallback locations for some data e.g. user output templates ?
 
 # FIXED: concurrent caching on very first run by two piped processes $ app ... | app ...
 [[ ${GUARDED+x} ]] || GUARDED="$0" exec flock -x "$0" "$0" "$@"

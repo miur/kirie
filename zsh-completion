@@ -25,7 +25,7 @@ case $CURRENT in
   ;;
 [3-9])
   # NOTE: skip if empty (compadd "") -- prevent space inserting
-  # print -l @ $CURRENT $words >&2
+  # >&2 print -l @ $CURRENT $words
   local opts=$(wiw $words[2,$CURRENT-1] --suggest-next-option)
   [[ -n $opts ]] && compadd "${(f)opts}"
   ;;

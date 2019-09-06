@@ -1,60 +1,57 @@
 #!/usr/bin/env bash
-#%SUMMARY: print help and input completion for app
+#%SUMMARY: help and command completion for main app
 #%PERF: 35ms
-set -fCueEo pipefail -o noglob
-clib=${WIW_CACHE_DIR:?}
+set -fCueEo pipefail
 
-searchcmd(){ local d=$1; shift
-  [[ -d $d ]] || return
-  (($#)) || set -- -printf '%P\n'
-  ## BUG: prune will remove everything because "~/.cache/wiw/*" matches hidden mask
-  # find -H "$d" -mindepth 1 \( -name '_*' -o -path '*/.*' \) -prune -o -xtype f -executable "$@"
-  find -H "$d" -mindepth 1 -not \( -name '_*' -o -name '.git' \) -xtype f -executable "$@"
-}
+main=${KIRIE_MAINAPP:?}
+dbase=${WIW_CACHE_DIR:?}  # =${XDG_CACHE_HOME:-$HOME/.cache}/$main
 
 # NEED: short preview on formats with description when completing very first word
-nextcmd(){ searchcmd "$clib/$1" | sort || true; }
-exedesc(){ searchcmd "$clib/$1" -printf '%P' -execdir sed -n '/^#%SUMMARY:\s*/{s//:"/;s/$/"/;p;q}' {} \; | sort; }
-
-die(){ echo "Err: $1"; shift; help "$@" >&2; exit 2; }
-help(){ local cmd=$1
-  echo "[operations]"
-  { while [[ ${cmd:+x} ]]; do
-      tree --noreport "$clib/$cmd" && return
-      [[ $cmd == */* ]] || break && cmd=${cmd%/*}
-    done
-    tree --noreport "$clib"
-  } | sed '1d;s/^/ /'
-}
+suggest(){ [[ $1 == -r ]] && local r=$1 && shift; "$main" kirie/suggest "$dbase/$1" "${r:+$dbase}" "${@:2}"; }
 
 # NOTE: recursive help for all subcommands on single page
-help_all(){ echo "[all]: ${1:+/$1/}"; searchcmd "$clib" -path "${1}?*" | sort; }
+exedesc(){ suggest -r "$1" -xtype f -printf '%P' \
+  -execdir sed -n '/^#%SUMMARY:\s*/{s//:/;p;q}' {} \; \ | column -tN2 -s: -o ' | '; }
 
-final_options(){ local fn arg=$1; shift
-  case $arg
-  in -h|--help) fn=help
-  ;; -H|--help-all) fn=help_all
-  ;; --suggest-next-option) fn=nextcmd
-  ;; --list-descriptions) fn=exedesc
-  ;; *) return
-  esac
-  "$fn" "$@"
-  exit 0
+die(){ echo "Err: $1"; help "${@:2}" >&2; exit 2; }
+
+help(){ local cmd=$1
+  local nmg=${cmd##*/}
+  local dir=${cmd%$nmg}
+
+  echo "[${main}] $cmd"
+
+  # ALT:BET? $ suggest -r "$cmd" | tree -aAC --noreport --dirsfirst --fromfile -- .
+
+  # TRY: print help w/o symlinks annotated / and --help-all with -> symlink
+  LC_ALL=C tree --noreport -aAC --prune --matchdirs --dirsfirst \
+    -I "_*" -P "${nmg}*" -- "$dbase/$dir" | tail -n +2
 }
 
-cmd=
-while true; do
-  (($#)) || die "incomplete [$cmd]" "$cmd"
-  arg=$1; shift
-  final_options "$arg" "$cmd"
-  cmd+=${cmd:+/}$arg
+getpath(){ declare -rn cmdpath=$1; local cmd=$2 count
+  cmdpath=$("$main" kirie/suggest "$dbase/$cmd")
+  count=${cmdpath//[^$'\n']}${cmdpath:+.}
+  count=${#count}
 
-  if [[ -x ${exe:=$clib/$cmd} ]]; then
-    # NOTE: suppress further completion FIXME: suppress only if not supported by end-binary
-    [[ " $* " =~ " --suggest-next-option " ]] && exit 0
-    exec "$exe" "$@"
-  fi
+  ((count < 1)) && die "unknown command" "$cmd"
+  ((count > 1)) && die "found multiple N=$count commands" "$cmd"
+  [[ -x $dbase/$cmd ]] || die "incomplete command" "$cmd"
+}
 
-  searchcmd -name "${cmd}?*" -print -quit | grep -q . && continue
-  die "unknown [$cmd]" "$cmd"
-done
+
+arg=${1-}
+cmd=${2-}
+shift || die "no arguments (print help)" ""
+
+
+# [_] BUG: wiw .cf/<TAB> don't work for ZSH
+#   => TEMP:HACK: must return full list of suggestions in case of crossing symlink boundary
+
+## NEED: suppress further completion FIXME: suppress only if not supported by end-binary
+case $arg
+in -h|--help) help "$cmd"
+;; -H|--help-all) suggest -r "$cmd"
+;; --suggest-next-option) suggest -r "$cmd"
+;; --list-descriptions) exedesc "$cmd"
+;; *) exe=; getpath exe "$arg"; exec "$exe" "$@"
+esac

@@ -23,10 +23,7 @@ my $dconfig = $ENV{WIW_CONFIG_DIR};
 
 # NOTE: cmdline validation
 my ($index) = grep { $ARGV[$_] eq '--' } (0 .. $#ARGV);
-die "Err: insert separator '--' between config name and executed command",$/ if not defined $index;
-die "Err: add cmdline to exec after '--' separator",$/ if $index == $#ARGV;
-my $rindex = $#ARGV - $index;
-
+my $argcount = $#ARGV;
 
 my %opts = ();
 GetOptions(\%opts   #%OPTIONS:
@@ -36,13 +33,28 @@ GetOptions(\%opts   #%OPTIONS:
 #%
 , 'help|h|?'        #% h = help
     => sub { print &help; exit }
+, '--suggest-next-option|H+' #% H+= suggest-next-option | built-in command completion and listing
 ) or die $/,&help;  #%
 
+# BUG: don't work because it's appended AFTER positional argument (config name)
+if ($opts{'suggest-next-option'}) {
+    if (@ARGV) {
+        print "--", $/;
+    } else {
+        opendir(my $dfd, $dconfig) or exit;
+        print join("\n", grep { !/^\.\.?$/ } readdir($dfd));
+        closedir($dfd);
+    }
+    exit;
+}
+
 sub help { open STDIN,'<',$0; grep { $_ } map { $1.$/ if /^(?:.*\s)?#%(.*)/ } <STDIN> }
+die "Err: insert separator '--' between config name and executed command",$/ if not defined $index;
+die "Err: add cmdline to exec after '--' separator",$/ if $index == $argcount;
 
 # WARN:FIXED: GetOptions(require_order) consumes "--" options terminator when there is no config on cmdline
 # WARN:FAIL: $ ./$0 [opts] -- config -- command
-$index = $#ARGV - $rindex;
+$index -= $argcount - $#ARGV;
 my @configs = map { $dconfig .'/'. $_ } @ARGV[0 .. $index - 1];
 my @cmd = @ARGV[$index + 1 .. $#ARGV];
 

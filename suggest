@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+#%SUMMARY: suggest completion for command prefix [relative to basedir]
+#%USAGE: $ ./$0 /path/to/basedir/cmd/pfx [/path/to/basedir] [find_args..]
+#%IDEA: reduce number of suggestions (show only API aliases but not content)
+#%  * .   => .{bb,cf,jr}
+#%  * .j  => .jr/
+#%  * .jr => .jr/{a,b,c,d}
+#%
+#%PERF: 76ms total $ wiw kirie/suggest ~/.cache/wiw/.cf
+set -o errexit -o noclobber -o noglob -o nounset -o pipefail
+
+# THINK: prevent alias symlinks pointing to outside dirs -- or not ?
+#   HACK:IDEA: wiw "(bin|sys)/" -> may directly point to /usr/bin :)
+
+find_args=()
+
+pfx=${1-}
+base=${2-}
+(($#>1)) && find_args=( "${@:3}" )
+
+nm=${pfx##*/}
+dir=${pfx%$nm}
+
+# DECI:(LC_ALL=C): arbitrary sorting of punctuation VS proper sorting of any UTF8
+findexe(){ local d=$1 fmt='%p\n'; shift
+  if [[ -n $base ]]; then
+    fmt=$(realpath --no-symlinks --relative-base="$base" -- "$d")
+    [[ $fmt == /* ]] && exit 2
+    [[ $fmt == . ]] && fmt='%P\n' || fmt+='/%P\n'
+  fi
+
+  local args=(
+    -mindepth 1
+    \( -name '_*' -o -name '.git' \) -prune -o
+    \( -xtype f -o \( -xtype d -type l \) \)
+    -executable "$@" "${find_args[@]}"
+  )
+
+  [[ ${find_args[*]:+x} ]] || args+=( -printf "$fmt" )
+
+  find -H "$d" "${args[@]}" | LC_ALL=C sort --ignore-case
+}
+
+if [[ $nm != . && $nm != .. ]]; then
+  [[ -z $pfx ]] && { findexe "$PWD"; exit; }
+  [[ -d $pfx ]] && { findexe "$pfx"; exit; }
+  # BUG:FIXME: must be relative if $base
+  [[ -e $pfx ]] && { printf '%s\n' "$pfx"; exit; }
+fi
+
+[[ -z $dir ]] && { findexe "$PWD" -path "${PWD}/${nm}?*"; exit; }
+[[ -d $dir ]] && { findexe "$dir" -path "${pfx}?*"; exit; }
+[[ -e $dir ]] && { printf '%s\n' "$dir"; exit; }
+
+# ALT:(always exit 1): FAILED: inconsistency between ::
+#   * "~/.cache/wiw/sss" -- no error for unknown file in existing dir
+#   * "~/.cache/wiw/sss/xxx" -- ERROR for unknown file in unknown dir
+exit 0

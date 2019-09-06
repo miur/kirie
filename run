@@ -14,6 +14,9 @@ set -eu
 
 nm=wiw
 
+#%ATT: always hardcoded withou fallback -- to overcome chaining of different main apps
+export KIRIE_MAINAPP="$nm"  # RENAME: KIRIE_ENTRYPOINT
+
 # NOTE: don't override user settings, only fallback
 set -o allexport
 : "${WIW_AUTH_DIR:=${XDG_CACHE_HOME:-$HOME/.cache}/$nm/_auth}"
