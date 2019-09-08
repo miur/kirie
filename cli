@@ -10,8 +10,8 @@ dbase=${WIW_CACHE_DIR:?}  # =${XDG_CACHE_HOME:-$HOME/.cache}/$main
 suggest(){ [[ $1 == -r ]] && local r=$1 && shift; "$main" kirie/suggest "$dbase/$1" "${r:+$dbase}" "${@:2}"; }
 
 # NOTE: recursive help for all subcommands on single page
-exedesc(){ suggest -r "$1" -xtype f -printf '%P' \
-  -execdir sed -n '/^#%SUMMARY:\s*/{s//:/;p;q}' {} \; \ | column -tN2 -s: -o ' | '; }
+exedesc(){ suggest -r "$1" -xtype f -printf '%P' -execdir sed -n '/^#%SUMMARY:\s*/{s//:/;p;q}' {} \; \
+  | column --table --table-columns 'COMMAND,SUMMARY' --table-wrap 2 -s: -o' | '; }
 
 die(){ echo "Err: $1"; help "${@:2}" >&2; exit 2; }
 
@@ -44,14 +44,17 @@ cmd=${2-}
 shift || die "no arguments (print help)" ""
 
 
-# [_] BUG: wiw .cf/<TAB> don't work for ZSH
-#   => TEMP:HACK: must return full list of suggestions in case of crossing symlink boundary
-
-## NEED: suppress further completion FIXME: suppress only if not supported by end-binary
 case $arg
 in -h|--help) help "$cmd"
-;; -H|--help-all) suggest -r "$cmd"
-;; --suggest-next-option) suggest -r "$cmd"
+;; -H|--help-all) exedesc "$cmd"
 ;; --list-descriptions) exedesc "$cmd"
+;; --suggest-next-completion)
+  exe=$("$main" kirie/suggest --all "$dbase/$cmd" "$dbase")
+  if [[ ! $exe =~ $'\n' && $exe == /* ]]; then
+    "$exe" --suggest-next-completion "${@:3}"
+  else
+    printf '%s\n' "$exe"
+  fi
+;; --suggest-next-option) "$main" kirie/suggest "$dbase/$cmd" "$dbase"
 ;; *) exe=; getpath exe "$arg"; exec "$exe" "$@"
 esac

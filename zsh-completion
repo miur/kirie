@@ -1,5 +1,5 @@
 #compdef wiw
-#%USAGE: $ rm ~/.cache/zsh/.zcompdump{,.zwc} && compinit
+#%USAGE: $ rm -f ~/.cache/zsh/.zcompdump{,.zwc} && compinit
 #%OR:DEBUG:(current shell only): $ compinit -D
 
 # WARN: each exe must implement "--suggest-next-option" for ZSH to work smoothly
@@ -9,7 +9,7 @@
 function _wiw_formats {
     local -a _formats
     # _formats=( 'list:List available profiles' ... )
-    _formats=( "${(f)"$(wiw --suggest-next-option)":gs/:/\\:}" )
+    _formats=( "${(f)"$(wiw --suggest-next-completion)":gs/:/\\:}" )
     _describe "supported formats" _formats
 }
 
@@ -20,13 +20,21 @@ case $CURRENT in
 2) _arguments \
   '(-h --help)'{-h,--help}'[display help message]' \
   '(- :)--version[print version information]' \
-  '(- :)--suggest-next-option[suggest next cmdword]' \
+  '(- :)--list-descriptions[summary per each command]' \
+  '(- :)--suggest-next-completion[suggest next cmdword (full list)]' \
+  '(- :)--suggest-next-option[suggest next cmdword (abbrev aliases)]' \
   '(-)::xxx:_wiw_formats'
   ;;
 [3-9])
   # NOTE: skip if empty (compadd "") -- prevent space inserting
-  # >&2 print -l @ $CURRENT $words
-  local opts=$(wiw $words[2,$CURRENT-1] --suggest-next-option)
+  #   >&2 print -l @ $CURRENT $words
+  # NOTE: --suggest-* must be before other positional options (otherwise ignored)
+  # FAIL: wiw .cf/<TAB> don't work for ZSH if you return only ".cf" alias without subcommands
+  #   !! ZSH requires to return all suggestions per position at once (no incremental update)
+  # TODO: forward "suggest" to next command at the end of arg list
+  #   NEED: suppress further completion
+  #   FIXME: suppress only if not supported by end-binary
+  local opts=$(wiw --suggest-next-completion $words[2,$CURRENT-1])
   [[ -n $opts ]] && compadd "${(f)opts}"
   ;;
 esac

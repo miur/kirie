@@ -33,16 +33,17 @@ GetOptions(\%opts   #%OPTIONS:
 #%
 , 'help|h|?'        #% h = help
     => sub { print &help; exit }
-, '--suggest-next-option|H+' #% H+= suggest-next-option | built-in command completion and listing
+, '--suggest-next-completion|H+' #% H+= suggest-next-completion | built-in command completion and listing
 ) or die $/,&help;  #%
 
-# BUG: don't work because it's appended AFTER positional argument (config name)
-if ($opts{'suggest-next-option'}) {
+# WARN: don't work if appended AFTER positional argument (config name)
+if ($opts{'suggest-next-completion'}) {
     if (@ARGV) {
-        print "--", $/;
-    } else {
+        # BAD: perl consumes first "--" before command
+        exec { $ARGV[0] } $ARGV[0], '--suggest-next-completion', @ARGV[1..$#ARGV];
+    } elsif (-d $dconfig) {
         opendir(my $dfd, $dconfig) or exit;
-        print join("\n", grep { !/^\.\.?$/ } readdir($dfd));
+        print join("\n", grep { !/^\.\.?$/ } readdir($dfd)), $/;
         closedir($dfd);
     }
     exit;

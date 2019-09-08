@@ -12,7 +12,12 @@ set -o errexit -o noclobber -o noglob -o nounset -o pipefail
 # THINK: prevent alias symlinks pointing to outside dirs -- or not ?
 #   HACK:IDEA: wiw "(bin|sys)/" -> may directly point to /usr/bin :)
 
+all=
 find_args=()
+
+case ${1-}
+in -a|--all) all=1 && shift
+esac
 
 pfx=${1-}
 base=${2-}
@@ -22,23 +27,24 @@ nm=${pfx##*/}
 dir=${pfx%$nm}
 
 # DECI:(LC_ALL=C): arbitrary sorting of punctuation VS proper sorting of any UTF8
-findexe(){ local d=$1 fmt='%p\n'; shift
+findexe(){ local d args fmt='%p\n'
+  d=$1 && shift
+
   if [[ -n $base ]]; then
     fmt=$(realpath --no-symlinks --relative-base="$base" -- "$d")
     [[ $fmt == /* ]] && exit 2
     [[ $fmt == . ]] && fmt='%P\n' || fmt+='/%P\n'
   fi
 
-  local args=(
-    -mindepth 1
-    \( -name '_*' -o -name '.git' \) -prune -o
-    \( -xtype f -o \( -xtype d -type l \) \)
-    -executable "$@" "${find_args[@]}"
-  )
+  # IDEA: return only aliases when "" or "*/", but search within aliases when "?*"
+  ((all)) && args=( -L ) || args=( -H )
+  args+=( "$d" -mindepth 1 \( -name '_*' -o -name '.git' \) -prune -o )
+  ((all)) && args+=( -type f ) || args+=( \( -xtype f -o \( -xtype d -type l \) \) )
+  args+=( -executable "$@" "${find_args[@]}" )
 
   [[ ${find_args[*]:+x} ]] || args+=( -printf "$fmt" )
 
-  find -H "$d" "${args[@]}" | LC_ALL=C sort --ignore-case
+  find "${args[@]}" | LC_ALL=C sort --ignore-case
 }
 
 if [[ $nm != . && $nm != .. ]]; then
