@@ -1,0 +1,91 @@
+#!/bin/sh
+#%SUMMARY: entry point and dispatcher to underlying suite (cached or not)
+#%USAGE:
+#%  [basic] $ ./$0 kirie/suggest
+#%  [batch] $ ./$0 kirie/recache && SUITE_RECACHE=never parallel ./$0 ...
+#%  [query] $ ./$0 --has wiw/env
+#%
+#%PERF: cli=70ms next=7ms
+set -fCeu
+
+# IDEA: system-wide simplicity
+#  * directly use PATH instead of XDG_LIBEXEC_PATH
+#  * discoverability is achieved by standard shell facilities
+#  * recaching is not needed -- kernel will search PATH each time
+#  * if recaching is still needed -- you may call it explicitly in prolog of each app
+#    e.g. hiddenly when you do "import kirie" in your app
+#  +++ NICE: preferred way for read-only distributions for end-users instead of active developers
+
+# FAIL:(unexpected consequences for root env): $ sudo wiw ""
+#   => SECU: it's actually unsafe to call under sudo whole wiw infrastructure due to number of scripts involved
+#   <= for "su - && wiw ..." XDG nonexistent for root user -- fallbacks must be different
+#   <= BUT for "sudo wiw ..." it's still expected to use current user XDG and only lift permissions
+
+# TODO: disable recaching by default unless you have SUITE_RECACHE={(""|never)|once|session|entry|always}
+#   FIXME: must completely remove recache from chain on "never" or ""
+#   BUT:DFL: I expect C sources "rebuild" and "relinking" will go on anyway
+#   DEV:(opt): don't cache anything -- always search -- slow but pure
+
+# FAIL: calling global exe "kirie" won't work in case of "git subtree"
+#   -- each module may (and will) have different version of "kirie"
+#   <= impossible to install all of them at once into PATH
+# ALT: use "build/configure" step to replace vars inside "kirie/kirie" template and use it directly
+#   e.g. fallback special vars by specific ${SUITE_TMPDIR:-WIW_TMPDIR}
+#   OR: substitute them totally everywhere (in all "kirie" scripts)
+#   BUT: where to place "WIW_AUTH_HOME" ?
+# exec kirie "$@"
+
+# NOTE: increase depth level on each chained exec
+#   MAYBE: try starting from "0" instead of "1" i.e. "0" == before "kirie/env-xdg"
+case ${SUITE_LEVEL:=0}
+in *[!0-9]*) SUITE_LEVEL=1
+;; *) SUITE_LEVEL=$((SUITE_LEVEL + 1))
+esac; export SUITE_LEVEL
+
+
+if builtin test "$SUITE_LEVEL" -gt 1; then
+  dbase=${SUITE_CACHE_HOME:?}
+
+  #%NOTE: redirects all long options directly to "cli" (e.g. completion requests from other exe)
+  case ${1-}
+  in --has) shift; checkcmd=1  # FIXME: must skip "recache" step
+  ;; -*|'') exec "$dbase/kirie/cli" "$@"
+  esac
+
+  cmd=${1:?Need full cmd designator (${SUITE_NAME:?} fmt/fn...)}
+  exe=$dbase/$cmd
+
+  if builtin test -f "$exe" -a -x "$exe" -a -s "$exe"; then
+    ${checkcmd+exit}
+    shift
+    exec "$exe" "$@"
+  else
+    ${checkcmd+exit 1}
+    >&2 echo "Err: not found cmd '$cmd'"
+    exit 2
+  fi
+fi
+
+
+# HACK:(aka busybox): suite is defined by the name of symlink
+# NOTE:(kirie/kirie): default script name provides reasonable KIRIE_* vars even without symlink
+# ALT:(kirie/suite): drop additional KIRIE_* vars and only leave SUITE_* vars available
+export SUITE_NAME=${0##*/}
+
+# THINK: how to bootstrap "kirie" to search and exec into overriden "kirie" inside LIBEXEC ??
+#   ~~ always use "kirie" from same dir for bootstrapping, but then exec into one found in LIBEXEC
+kirie=$(realpath -e "$0")
+kirie=${kirie%/*}
+
+# MAYBE: add { "$main/config" "kirie/config" } into this default chain to remove reexec everywhere ?
+# MAYBE:(opt): on "--pure" prepend chain by "env-std"
+# WARN: must call "kirie/cli" here instead of exec "$0" which will fallback into "cli" on LVL=2
+#   -- otherwise incomplete command won't show help with suggestions
+exec "$kirie/env-xdg" "$kirie/env-suite" "$kirie/recache" "$kirie/cli" "$@"
+
+# feki(){ PATH="${KIRIE_LIBEXEC_PATH:?}" command -v "$@"; }
+# xdg=$(feki xdg-env)
+# env=$(feki env)
+# recache=$(feki recache)
+# cli=$(feki cli)
+# exec "$xdg" "$env" "$recache" "$cli" "$@"

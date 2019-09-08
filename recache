@@ -1,9 +1,11 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
+# RENAME: xdg-db
 #%SUMMARY: cache symlinks to all commands found under XDG paths
 #%USAGE:(once): export APP_CACHE_DIR=$(app-xdg-cache app); exec app "$@"
 #%PERF: first=37ms idle=23ms
 set -fCueo pipefail
 
+# DEV: clean-up cache dir from previous stale symlinks (and only symlinks -- keep other data)
 # NEED: I need cleanup for old links
 #   <= earlier I had no such problem due to using text file recreated each time...
 #   MAYBE:IDEA: dump list of symlinks into stampfile and then cleanup from folder all links not in that file ?
@@ -11,21 +13,26 @@ set -fCueo pipefail
 
 # MAYBE: also use ~/.local/share/wiw as fallback locations for some data e.g. user output templates ?
 
+## ALT:
+# [[ ${GUARDED+x} ]] || GUARDED="$0" exec flock --exclusive --no-fork "$0" "$0" "$@"
+# unset GUARDED
+# set -r
+
 # FIXED: concurrent caching on very first run by two piped processes $ app ... | app ...
-[[ ${GUARDED+x} ]] || GUARDED="$0" exec flock -x "$0" "$0" "$@"
-set -r
+# EXPL: detect concurrent process, wait until it releases lock, do not try to recache again
+exec {lock_fd}< "$0"
+if ! flock --exclusive --no-fork --nonblock "$lock_fd"; then
+  flock --exclusive --no-fork "$lock_fd"
+  exec "$@" {lock_fd}>&-
+fi
 
-# MAYBE: not the best way to combine XDG search with default env/dirs creation...
-pkgdirs=( "${WIW_AUTH_DIR:?}" "${WIW_TEMP_DIR:?}" )
+dcache=${SUITE_CACHE_HOME:?}
+execpath=${SUITE_LIBEXEC_PATH:?}
 
-pkgname=${1:-wiw}
+# ATT: don't try to read STDIN directly -- "./$0" is part of global chain
+nl=$'\n'
+exec <<< "${execpath//:/$nl}"
 
-# ATT: extensions to XDG standard :: infix=[_LIBEXEC_] and sfx=[_PATH]
-libexecpath=${XDG_LIBEXEC_PATH-${XDG_LIBEXEC_HOME-$HOME/.local/libexec}:${XDG_LIBEXEC_DIRS-/usr/local/libexec:/usr/libexec}}
-cachedir=${XDG_CACHE_HOME:-$HOME/.cache}
-d_cache=$cachedir/$pkgname
-
-paths_under(){ sed 's/^/:/; s/$/:/; s/\s*:\s*/:/g; s/:\+/:/g; s/^://; s|:|/'"$1"':|g; s/:$//; s/:/\n/g'; }
 
 dirs_validate(){ declare -rn ds=$1; ds=()
   while IFS= read -r d; do [[ -d $d ]] && ds+=("$d"); done
@@ -38,6 +45,14 @@ dirs_merge(){ declare -rn ds=$1; shift
     "$@" -printf '%P:%p\n' | awk -F: '!a[$1]++ && $2'
 }
 
+## ERROR: must only create symlinks to "./exefile" and other "abspath-symlinks" without resolution
+##  !! all "relative-symlinks" pointing inside suite must be copied as-is !!
+#
+# if [[ -L $d/$nm && -L $pth ]]; then
+#   src=$(readlink -- "$pth")
+#   dst=$(readlink -- "$d/$nm")
+#   [[ $src == "$dst" ]] && continue
+# fi
 cache_exe(){ local -r d=$1; shift
   while IFS=: read -r nm pth; do
     # DEBUG: >&2 echo "$nm : $pth : $d/${nm%/*}"
@@ -52,9 +67,11 @@ cache_exe(){ local -r d=$1; shift
 #   MAYBE: symlinks to dir -- inside "lpath", but symlinks to file -- anywhere ?
 #     NICE: you can symlink your private extensions into std dirs instead of modifying ENV paths
 #     BAD:SECU: end-file can be uncontrollably replaced by something harmful
+# PERF:RFC: apply "realpath" to many files in one go -- then find "diff/comm" between two files and apply "cp" to it
 copy_symlinks(){ local d=$1 src dst; shift
   while IFS=: read -r nm pth; do
-    src=$(realpath -e --relative-base="${pth%/$nm}" -- "$pth")
+    ## NOTE: copying dangling symlinks is actually OK -- they can be aliases to another layer of suite
+    src=$(realpath -m --relative-base="${pth%/$nm}" -- "$pth")
     [[ $src == /* ]] && >&2 echo "Warn: ignoring external symlink=$pth" && continue
     dst=$(realpath -m --relative-base="$d" -- "$d/$nm")
     [[ $src == "$dst" ]] && continue
@@ -63,13 +80,9 @@ copy_symlinks(){ local d=$1 src dst; shift
   done
 }
 
-# DEV: clean-up cache dir from previous stale symlinks (and only symlinks -- keep other data)
-mkdir -p "${pkgdirs[@]}"
-chmod 700 "${pkgdirs[@]}"
+dirs_validate lpath
+dirs_merge lpath -xtype f -executable | cache_exe "$dcache"
+dirs_merge lpath -type l | copy_symlinks "$dcache"
 
-existingdirs=$(paths_under "$pkgname" <<< "$libexecpath")
-dirs_validate lpath <<< "$existingdirs"
-dirs_merge lpath -type f -executable | cache_exe "$d_cache"
-dirs_merge lpath -type l | copy_symlinks "$d_cache"
-
-printf '%s\n' "$d_cache"
+# ALT: flock --unlock "$lock_fd"
+exec "$@" {lock_fd}>&-

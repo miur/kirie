@@ -1,10 +1,10 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
 #%SUMMARY: help and command completion for main app
 #%PERF: 35ms
 set -fCueEo pipefail
 
-main=${KIRIE_MAINAPP:?}
-dbase=${WIW_CACHE_DIR:?}  # =${XDG_CACHE_HOME:-$HOME/.cache}/$main
+main=${SUITE_NAME:?}
+dbase=${SUITE_CACHE_HOME:?}
 
 # NEED: short preview on formats with description when completing very first word
 suggest(){ [[ $1 == -r ]] && local r=$1 && shift; "$main" kirie/suggest "$dbase/$1" "${r:+$dbase}" "${@:2}"; }
@@ -13,7 +13,7 @@ suggest(){ [[ $1 == -r ]] && local r=$1 && shift; "$main" kirie/suggest "$dbase/
 exedesc(){ suggest -r "$1" -xtype f -printf '%P' -execdir sed -n '/^#%SUMMARY:\s*/{s//:/;p;q}' {} \; \
   | column --table --table-columns 'COMMAND,SUMMARY' --table-wrap 2 -s: -o' | '; }
 
-die(){ echo "Err: $1"; help "${@:2}" >&2; exit 2; }
+die(){ >&2 echo "Err: $1"; help "${@:2}" >&2; exit 2; }
 
 help(){ local cmd=$1
   local nmg=${cmd##*/}
@@ -33,7 +33,7 @@ getpath(){ declare -rn cmdpath=$1; local cmd=$2 count
   count=${cmdpath//[^$'\n']}${cmdpath:+.}
   count=${#count}
 
-  ((count < 1)) && die "unknown command" "$cmd"
+  ((count < 1)) && die "unknown command (or dangling symlink)" "$cmd"
   ((count > 1)) && die "found multiple N=$count commands" "$cmd"
   [[ -x $dbase/$cmd ]] || die "incomplete command" "$cmd"
 }
@@ -51,7 +51,10 @@ in -h|--help) help "$cmd"
 ;; --suggest-next-completion)
   exe=$("$main" kirie/suggest --all "$dbase/$cmd" "$dbase")
   if [[ ! $exe =~ $'\n' && $exe == /* ]]; then
-    "$exe" --suggest-next-completion "${@:3}"
+    # HACK: check if option is present in script/binary cmd
+    if grep -q -- '--suggest-next-completion' "$exe"; then
+      exec "$exe" --suggest-next-completion "${@:3}"
+    fi
   else
     printf '%s\n' "$exe"
   fi

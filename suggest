@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
 #%SUMMARY: suggest completion for command prefix [relative to basedir]
 #%USAGE: $ ./$0 /path/to/basedir/cmd/pfx [/path/to/basedir] [find_args..]
 #%IDEA: reduce number of suggestions (show only API aliases but not content)
@@ -19,9 +19,15 @@ case ${1-}
 in -a|--all) all=1 && shift
 esac
 
+# MAYBE:BET: make "$1=basedir" obligatory and pass "-r|--relative" OR "-p|--absolute" to make args simpler
 pfx=${1-}
 base=${2-}
 (($#>1)) && find_args=( "${@:3}" )
+
+# ATT! don't use PWD as default directory
+#  * BAD: it's too unexpected for "kirie" suite which must use its own defaults
+#  * SECU:PERF: current dir can be HOME -- must prevent searching of all contained files indiscriminately
+[[ ${pfx:0:1} == / ]] || pfx=${SUITE_CACHE_HOME:?}/$pfx
 
 nm=${pfx##*/}
 dir=${pfx%$nm}
@@ -48,13 +54,13 @@ findexe(){ local d args fmt='%p\n'
 }
 
 if [[ $nm != . && $nm != .. ]]; then
-  [[ -z $pfx ]] && { findexe "$PWD"; exit; }
+  # [[ -z $pfx ]] && { findexe "$PWD"; exit; }
   [[ -d $pfx ]] && { findexe "$pfx"; exit; }
   # BUG:FIXME: must be relative if $base
   [[ -e $pfx ]] && { printf '%s\n' "$pfx"; exit; }
 fi
 
-[[ -z $dir ]] && { findexe "$PWD" -path "${PWD}/${nm}?*"; exit; }
+# [[ -z $dir ]] && { findexe "$PWD" -path "${PWD}/${nm}?*"; exit; }
 [[ -d $dir ]] && { findexe "$dir" -path "${pfx}?*"; exit; }
 [[ -e $dir ]] && { printf '%s\n' "$dir"; exit; }
 

@@ -1,0 +1,66 @@
+#!/bin/sh
+# RENAME: xdg
+#%SUMMARY: explicitly export default XDG environment with extensions
+#%ATT: extensions to XDG standard
+#%  * infix=[_LIBEXEC_|_LIB_|_SRC_]
+#%  * sfx=[_PATH]
+set -fCeu
+
+#%NOTE: don't override user settings, only fallback
+set -o allexport
+
+# NOTE: redefine XDG_LIB_DIRS+= if you want fallback to some user's dirs in case official package don't have them
+: "${XDG_LIB_HOME=${HOME:?}/.local/lib}"
+: "${XDG_LIB_DIRS=/usr/local/lib:/usr/lib}"
+: "${XDG_LIB_PATH=$XDG_LIB_HOME:$XDG_LIB_DIRS}"
+
+: "${XDG_LIBEXEC_HOME=${HOME:?}/.local/libexec}"
+: "${XDG_LIBEXEC_DIRS=/usr/local/libexec:/usr/libexec}"
+: "${XDG_LIBEXEC_PATH=$XDG_LIBEXEC_HOME:$XDG_LIBEXEC_DIRS}"
+
+: "${XDG_SRC_HOME=${HOME:?}/.local/src}"
+: "${XDG_SRC_DIRS=/usr/local/src:/usr/src}"
+: "${XDG_SRC_PATH=$XDG_SRC_HOME:$XDG_SRC_DIRS}"
+
+# CASE: "share" means "shared between multiple pkgs" and platform independent files only
+#   => binary files are not desired there, scripts at max
+: "${XDG_DATA_HOME=${HOME:?}/.local/share}"
+: "${XDG_DATA_DIRS=/usr/local/share:/usr/share}"
+: "${XDG_DATA_PATH=$XDG_DATA_HOME:$XDG_DATA_DIRS}"
+
+# CASE: configs to interactive tools and their "state", nothing more
+#   => must be populated from pristine files of "/usr/share/factory/etc/$nm"
+: "${XDG_CONFIG_DIRS=/etc/xdg}"
+: "${XDG_CONFIG_HOME=${HOME:?}/.config}"
+: "${XDG_CONFIG_PATH=$XDG_CONFIG_HOME:$XDG_CONFIG_DIRS}"
+
+# CASE: "cache" is mostly to accomodate self-compiling .cpp files
+#   WARN: must not be used directly and only passed to CXX shebang wrapper
+# BAD:(fallback): /var/cache requires write permissions and pre-created directory by tmpfiles.d
+: "${XDG_CACHE_DIRS=/var/cache}"
+: "${XDG_CACHE_HOME=${HOME:?}/.cache}"
+: "${XDG_CACHE_PATH=$XDG_CACHE_HOME:$XDG_CACHE_DIRS}"
+
+# CASE: persistently stored variable (private) state, downloaded files
+#   => must be populated from pristine files of "/usr/share/factory/var/$nm"
+# MAYBE?(localstatedir): /usr/local/var
+: "${XDG_STATE_DIRS=/var/lib}"
+: "${XDG_STATE_HOME=${HOME:?}/.config}"
+: "${XDG_STATE_PATH=$XDG_STATE_HOME:$XDG_STATE_DIRS}"
+
+: "${TMPDIR=/tmp/${USER:?}}"
+: "${XDG_TMPDIR=$TMPDIR}"
+
+# BAD:(fallback): requires similar fallback everywhere if you want to pass data
+: "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+
+# if ! [[ -d $runstatedir && -O $runstatedir && -w $runstatedir ]]; then
+#   : "${XDG_RUNTIME_DIR:-$TMPDIR}"
+#   mkdir -m0700 -p "$runstatedir"
+# fi
+
+set +o allexport
+
+# MAYBE: pass through "env" to allow "-i" option to clean env and keep only cfg above ?
+#   BET: impl dedicated option to clean env -- because we must inherit user base vars anyway
+exec "$@"

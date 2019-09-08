@@ -1,0 +1,55 @@
+#!/usr/bin/bash
+#%SUMMARY: export derived base SUITE environment for kirie
+set -fCeu
+shopt -s extglob
+
+#%ATT: must be hardcoded in wrapper without fallback -- to overcome chaining of different main apps
+# RENAME: SUITE_ENTRY_POINT | SUITE_MAINAPP
+main=${SUITE_NAME:?}
+
+defvar(){ local v=${1^^}
+  declare -rn m="${main^^}_$v" s="SUITE_$v" x="XDG_$v"
+  [[ ${m+x} ]] && s=$m
+  [[ ${s+x} ]] && export s && return
+  x=${x:?}
+  x=${x//+(:)/:}
+  x=${x%:}
+  x=${x#:}
+  export s=${x//://$main:}/$main
+}
+
+defvar lib_path
+defvar libexec_path
+defvar data_path
+defvar config_home
+defvar cache_home
+defvar tmpdir
+
+# NOTE: special var to be used for bootstrapping by kirie/kirie
+#  !! different for each suite -- because it's subpath inside each suite, and not separate suite itself
+export KIRIE_LIBEXEC_PATH="${SUITE_LIBEXEC_PATH//://kirie:}/kirie"
+export SELF_LIBEXEC_PATH="${SUITE_LIBEXEC_PATH//://$main:}/$main"
+
+
+# ALT: print warn if permissions for existing dirs are wrong -- but never autofix them
+# (( 700 == ${perm:=$(command stat -c%a "$SUITE_TMPDIR")} )) \
+# || >&2 echo "Warn: wrong permissions $perm for $SUITE_TMPDIR"
+dmkdir(){ if builtin test -d "$1"
+then command chmod 700 -- "$1"
+else command mkdir --parents --mode='700' -- "$1"
+fi; }
+
+dmkdir "$SUITE_TMPDIR"
+
+
+## HACK: auto-source main env NICE: resolves cyclic deps in "kirie/kirie"
+# * BAD: functional entanglement
+# * BAD: silent fallback
+# XXX: why I use low-level "command -v" instead of "wiw $SUITE_NAME/env" ?
+#   ::: seems like it's needed to check if program truly exists...
+#   PERF:(slow): mainenv=$("$main" --has "$main"/env)
+if mainenv=$(PATH="${SELF_LIBEXEC_PATH:?}" command -v 'env'); then
+  exec "$mainenv" "$@"
+else
+  exec "$@"
+fi

@@ -24,29 +24,23 @@ install:
 	install -d '$(bindir)' '$(libexecdir)' '$(datadir)'
 	'$(here)/suggest' ./ ./ -xtype f -exec install -vT -Dm755 -- '{}' '$(dexe)/{}' \;
 	'$(here)/suggest' ./ ./ -xtype d -type l -exec cp -vfdT -- '{}' '$(dexe)/{}' \;
-	ln -svrfPT '$(dexe)/kirie/run' '$(bindir)/$(pkgname)'
-	ln -svrfPT '$(dexe)/kirie/xdg' '$(bindir)/$(pkgname)-xdg'
-	ln -svrfPT '$(dexe)/kirie/cli' '$(bindir)/$(pkgname)-cli'
+	ln -svrfPT '$(dexe)/kirie/kirie' '$(bindir)/$(pkgname)'
 	install -d '$(datadir)/zsh/site-functions'
 	install -vDm644 '$(here)/zsh-completion' '$(datadir)/zsh/site-functions/_$(pkgname)'
 	install -vDm644 LICENSE -t '$(datadir)/licenses/$(pkgname)'
 	install -vDm644 README.md -t '$(datadir)/doc/$(pkgname)'
 
 
-install-dev:
+dev-install:
 	install -d '$(libexecdir)'
 	ln -svfT '$(d_pj)' '$(dexe)'
-	ln -svfT '$(dexe)/kirie/run' '$(bindir)/$(pkgname)'
-	ln -svfT '$(dexe)/kirie/xdg' '$(bindir)/$(pkgname)-xdg'
-	ln -svfT '$(dexe)/kirie/cli' '$(bindir)/$(pkgname)-cli'
+	ln -svfT '$(dexe)/kirie/kirie' '$(bindir)/$(pkgname)'
 	install -d '$(datadir)/zsh/site-functions'
 	ln -svfT '$(here)/zsh-completion' '$(datadir)/zsh/site-functions/_$(pkgname)'
 
 
-uninstall-dev:
+dev-uninstall:
 	rm -v \
 	  '$(bindir)/$(pkgname)' \
-	  '$(bindir)/$(pkgname)-xdg' \
-	  '$(bindir)/$(pkgname)-cli' \
 	  '$(dexe)' \
 	  '$(datadir)/zsh/site-functions/_$(pkgname)' \

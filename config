@@ -1,6 +1,8 @@
 #!/usr/bin/env perl
 #%SUMMARY: read requested XDG config(s) and export their keyvalues to ENV
+#%NOTE: use default config for API/session fallback when chaining other tools
 #%USAGE:
+#%  [default] $ ./$0 [opts] -- cmd [args]
 #%  [augment] $ ./$0 [opts] {name|subpath} [fallbacks] -- cmd [args]
 #%  [replace] $ ./$0 --force {name|subpath} [overrides] -- cmd [args]
 #%  [cleanup] $ ./$0 --clean {name|subpath} [extends] -- cmd [args]
@@ -16,10 +18,8 @@ use 5.010;  # for '//' -- fallback if not defined
 use Getopt::Long qw(GetOptions :config bundling require_order
 no_auto_abbrev no_getopt_compat no_ignore_case no_pass_through);
 
-$ENV{XDG_CONFIG_HOME} //= $ENV{HOME} . "/.config";
-$ENV{WIW_CONFIG_DIR} //= $ENV{XDG_CONFIG_HOME} . "/wiw";
-
-my $dconfig = $ENV{WIW_CONFIG_DIR};
+my $dconfig = $ENV{SUITE_CONFIG_HOME} or die;
+my $default = $ENV{KIRIE_CONFIG_DEFAULT};
 
 # NOTE: cmdline validation
 my ($index) = grep { $ARGV[$_] eq '--' } (0 .. $#ARGV);
@@ -40,7 +40,8 @@ GetOptions(\%opts   #%OPTIONS:
 if ($opts{'suggest-next-completion'}) {
     if (@ARGV) {
         # BAD: perl consumes first "--" before command
-        exec { $ARGV[0] } $ARGV[0], '--suggest-next-completion', @ARGV[1..$#ARGV];
+        splice @ARGV, 1, 0, '--suggest-next-completion';
+        exec { $ARGV[0] } @ARGV;
     } elsif (-d $dconfig) {
         opendir(my $dfd, $dconfig) or exit;
         print join("\n", grep { !/^\.\.?$/ } readdir($dfd)), $/;
@@ -56,8 +57,15 @@ die "Err: add cmdline to exec after '--' separator",$/ if $index == $argcount;
 # WARN:FIXED: GetOptions(require_order) consumes "--" options terminator when there is no config on cmdline
 # WARN:FAIL: $ ./$0 [opts] -- config -- command
 $index -= $argcount - $#ARGV;
-my @configs = map { $dconfig .'/'. $_ } @ARGV[0 .. $index - 1];
+
 my @cmd = @ARGV[$index + 1 .. $#ARGV];
+
+my @configs;
+if ($index > 0) {
+    @configs = @ARGV[0 .. $index - 1]);
+} elsif ($default)
+    @configs = ($default);
+}
 
 # MAYBE: allow full path to config BET: use separate config/to/keyval tool for this
 # TODO:SPLIT: $ arg/to/line nm... | path/absolute <d_cfg> | path/read-blob | config/to/keyval | keyval/to/env -- cmdline...
@@ -67,7 +75,7 @@ my @cmd = @ARGV[$index + 1 .. $#ARGV];
 for my $cfg (@configs) {
     my $fh;
     # TRY:(\die): eval { open($fh, '<', $cfg) } or $fn_err;
-    eval { open($fh, '<', $cfg) };
+    eval { open($fh, '<', $dconfig .'/'. $cfg) };
     if ($@) { defined $opts{'skip-errors'} ? next : die; }
 
     #%FORMAT: <transformations>
