@@ -1,4 +1,9 @@
 #!/usr/bin/env perl
+#
+# SPDX-FileCopyrightText: 2019 Dmytro Kolomoiets <amerlyq@gmail.com> and contributors
+#
+# SPDX-License-Identifier: Apache-2.0
+#
 #%SUMMARY: read requested XDG config(s) and export their keyvalues to ENV
 #%NOTE: use default config for API/session fallback when chaining other tools
 #%USAGE:

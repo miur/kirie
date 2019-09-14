@@ -1,4 +1,11 @@
+#
+# SPDX-FileCopyrightText: 2019 Dmytro Kolomoiets <amerlyq@gmail.com> and contributors
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+#%USAGE: $ make --file=./$0 pkgname=kirie check-reuse
 #%DEBUG: $ make prefix=/tmp/_install install
+#%DEPS(optional): |aur/reuse|
 #%
 .POSIX:
 .DEFAULT_GOAL = help
@@ -44,3 +51,7 @@ dev-uninstall:
 	  '$(bindir)/$(pkgname)' \
 	  '$(dexe)' \
 	  '$(datadir)/zsh/site-functions/_$(pkgname)' \
+
+
+check-reuse:
+	reuse lint

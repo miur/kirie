@@ -1,4 +1,9 @@
 #!/usr/bin/bash
+#
+# SPDX-FileCopyrightText: 2019 Dmytro Kolomoiets <amerlyq@gmail.com> and contributors
+#
+# SPDX-License-Identifier: Apache-2.0
+#
 #%SUMMARY: export derived base SUITE environment for kirie
 set -fCeu
 shopt -s extglob

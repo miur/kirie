@@ -1,4 +1,9 @@
 #!/usr/bin/bash
+#
+# SPDX-FileCopyrightText: 2019 Dmytro Kolomoiets <amerlyq@gmail.com> and contributors
+#
+# SPDX-License-Identifier: Apache-2.0
+#
 # RENAME: xdg-db
 #%SUMMARY: cache symlinks to all commands found under XDG paths
 #%USAGE:(once): export APP_CACHE_DIR=$(app-xdg-cache app); exec app "$@"

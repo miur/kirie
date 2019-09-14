@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2019 Dmytro Kolomoiets <amerlyq@gmail.com> and contributors
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
 # kirie
 Cross-language application composition standard
 
@@ -25,6 +31,16 @@ Lets face reality: actually both "dast" and even "kirie" IS **buildsystem**
 * managing artifacts on all steps: rebuilding, cleaning, caching…
 * incremental update of immediate system when changing code inside any script
 
+
+# COPYING
+* You are allowed to repurpose the source code files under Apache-2.0 license.
+* Documentation is governed by copyleft CC-BY-SA-4.0 which results in
+  this software as combined whole required to be distributed also share-alike.
+* As a consequence, to satisfy incompatible relicensing terms (e.g. proprietary)
+  you must remove documentation and keep only files with explicit permissive licenses.
+* This project strives to be fully compliant with REUSE v3.0+ Specification,
+  therefore all files are expected to contain explicit SPDX v2.1+ annotations
+  to help differentiating terms of reuse of each file.
 
 
 # TBD

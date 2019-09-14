@@ -1,4 +1,9 @@
 #compdef wiw
+#
+# SPDX-FileCopyrightText: 2019 Dmytro Kolomoiets <amerlyq@gmail.com> and contributors
+#
+# SPDX-License-Identifier: Apache-2.0
+#
 #%USAGE: $ rm -f ~/.cache/zsh/.zcompdump{,.zwc} && compinit
 #%OR:DEBUG:(current shell only): $ compinit -D
 
