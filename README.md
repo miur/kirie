@@ -5,18 +5,23 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 -->
 
 # kirie
+
 Cross-language application composition standard
 
 
 ## As Library
+
 It's a library in the same sense as "set of tools" you can use in your app.
 Instead of "these tools will use YOUR app" which is common for frameworks.
+
 * you can use any piece independently with only strictly necessary dependencies
 * you can create partial derivative works
 
 
 ## As Framework
-Don't get me wrong: linux kernel IS **framework** also
+
+Don't get me wrong: linux kernel is **framework** also
+
 * all new pieces of code must follow set of conventions and standards
 * everything has the same fixed API
 * adding new code initially is easy but becomes increasingly difficults with
@@ -25,7 +30,9 @@ Don't get me wrong: linux kernel IS **framework** also
 
 
 ## As Buildsystem
-Lets face reality: actually both "dast" and even "kirie" IS **buildsystem**
+
+Lets face reality: actually both "dast" and even "kirie" is **buildsystem**
+
 * track dependencies and draw dependency graph
 * track fixed datastreams through topologies
 * managing artifacts on all steps: rebuilding, cleaning, caching…
@@ -33,6 +40,7 @@ Lets face reality: actually both "dast" and even "kirie" IS **buildsystem**
 
 
 # COPYING
+
 * You are allowed to repurpose the source code files under Apache-2.0 license.
 * Documentation is governed by copyleft CC-BY-SA-4.0 which results in
   this software as combined whole required to be distributed also share-alike.
@@ -46,8 +54,11 @@ Lets face reality: actually both "dast" and even "kirie" IS **buildsystem**
 # TBD
 
 IDEA: separate setting env vars for SUITE from pure functions of stdin/cmdline args
-  !!! "dast" is based on "kirie", but "kirie" itself must be based on "dast"
+
+* !!! "dast" is based on "kirie", but "kirie" itself must be based on "dast"
+
 
 TODO
-    TRY to combine "config" with "env"
-    TRY to replace "wiw/config" by "kirie/config" with overriden fallbacks
+
+* TRY to combine "config" with "env"
+* TRY to replace "wiw/config" by "kirie/config" with overriden fallbacks

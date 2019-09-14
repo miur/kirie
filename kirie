@@ -72,13 +72,22 @@ if builtin test "$SUITE_LEVEL" -gt 1; then
 fi
 
 
+# NOTE: applied if ./$0 is symlink to actual exe with different name
+if builtin test -L "$0" && nm=$(readlink "$0"); then
+  case $nm in */*) nm=${0##*/} ;; esac
+else
+  nm=${0##*/}
+fi
+
+
 # HACK:(aka busybox): suite is defined by the name of symlink
 # NOTE:(kirie/kirie): default script name provides reasonable KIRIE_* vars even without symlink
 # ALT:(kirie/suite): drop additional KIRIE_* vars and only leave SUITE_* vars available
-export SUITE_NAME=${0##*/}
+export SUITE_NAME="$nm"
 
 # THINK: how to bootstrap "kirie" to search and exec into overriden "kirie" inside LIBEXEC ??
 #   ~~ always use "kirie" from same dir for bootstrapping, but then exec into one found in LIBEXEC
+# MAYBE:BET: use same dir as "${0%/*}" to auto-access ANY manually replaced files in /usr/local
 kirie=$(realpath -e "$0")
 kirie=${kirie%/*}
 
