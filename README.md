@@ -62,3 +62,15 @@ TODO
 
 * TRY to combine "config" with "env"
 * TRY to replace "wiw/config" by "kirie/config" with overriden fallbacks
+
+
+ARCH: **kirie** is everything else, which doesn't fit anywhere and whole project altogether.
+What **kirie** means for different roles:
+
+* author -- site generation, documentation, etc.
+* researcher -- lisp-like mix of deps mgmt build system with runtime code running
+* developer -- script templates, syntax glue, runtime auto-linking, monads
+* contributor -- build system, code style, licenses, arch graphs, etc.
+* maintainer -- packages for distributions
+* dependency -- API, standards, libraries
+* user -- man pages, usage patterns
