@@ -57,6 +57,10 @@ IDEA: separate setting env vars for SUITE from pure functions of stdin/cmdline a
 
 * !!! "dast" is based on "kirie", but "kirie" itself must be based on "dast"
 
+SEE: A library to make languages that can communicate with each other and C
+
+* https://github.com/o11c/nicate
+
 
 TODO
 
